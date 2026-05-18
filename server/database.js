@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'econudge.db'));
+const db = new Database(path.join(process.env.DB_PATH || __dirname, 'econudge.db'));
 
 function initializeDatabase() {
   // Enable WAL mode for better performance
