@@ -1,47 +1,33 @@
 const express = require('express');
-const { client } = require('../database');
+const db = require('../database');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all activities for user
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, (req, res) => {
   try {
-    const result = await client.execute({
-      sql: 'SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC',
-      args: [req.userId],
-    });
-    res.json(result.rows);
+    const activities = db.prepare('SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC').all(req.userId);
+    res.json(activities);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Add activity
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, (req, res) => {
   try {
     const { category, activity, carbon_kg, date } = req.body;
-    await client.execute({
-      sql: 'INSERT INTO activities (user_id, category, activity, carbon_kg, date) VALUES (?, ?, ?, ?, ?)',
-      args: [req.userId, category, activity, carbon_kg, date || new Date().toISOString().split('T')[0]],
-    });
-    const result = await client.execute({
-      sql: 'SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
-      args: [req.userId],
-    });
-    res.json(result.rows[0]);
+    const result = db.prepare('INSERT INTO activities (user_id, category, activity, carbon_kg, date) VALUES (?, ?, ?, ?, ?)')
+      .run(req.userId, category, activity, carbon_kg, date || new Date().toISOString().split('T')[0]);
+    const newActivity = db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
+    res.json(newActivity);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete activity
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, (req, res) => {
   try {
-    await client.execute({
-      sql: 'DELETE FROM activities WHERE id = ? AND user_id = ?',
-      args: [req.params.id, req.userId],
-    });
+    db.prepare('DELETE FROM activities WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
